@@ -1,34 +1,44 @@
-from bs4 import BeautifulSoup
 import requests
 import pandas as pd
+from bs4 import BeautifulSoup
 
 # Step 1: Send a request to Wikipedia and get the HTML content
 url = 'https://en.wikipedia.org/wiki/List_of_largest_companies_in_the_United_States_by_revenue'
-page = requests.get(url)
-soup = BeautifulSoup(page.text, 'html.parser')
 
-# Step 2: Extract the first table from the page
-table = soup.find_all('table')[0]
+try:
+    response = requests.get(url)
+    response.raise_for_status()  # Raises an error for unsuccessful requests
+except requests.exceptions.RequestException as e:
+    print(f"Error fetching the page: {e}")
+    exit()
 
-# Step 3: Extract table headers
-table_headers = table.find_all('th')
+soup = BeautifulSoup(response.text, 'html.parser')
 
-# Step 4: Create a list of column names from table headers
-table_headers_titles = [title.text.strip() for title in table_headers]
+# Step 2: Find all tables and ensure at least one exists
+tables = soup.find_all('table')
 
-# Step 5: Initialize an empty DataFrame with the extracted column names
-df = pd.DataFrame(columns=table_headers_titles)
+if not tables:
+    print("No tables found on the page.")
+    exit()
 
-# Step 6: Extract table rows and populate the DataFrame
-column_data = table.find_all('tr')  # Get all rows
-for row in column_data[1:]:  # Skip the header row
-    row_data = row.find_all('td')  # Extract columns from the row
-    individual_row_data = [data.text.strip() for data in row_data]  # Clean the text data
+# Step 3: Extract the first table
+table = tables[0]
 
-    # Append the row data to the DataFrame
-    length = len(df)
-    df.loc[length] = individual_row_data
+# Step 4: Extract headers
+headers = [header.text.strip() for header in table.find_all('th')]
 
-# Step 7: Save the DataFrame to a CSV file
+# Step 5: Extract rows
+rows = []
+for row in table.find_all('tr')[1:]:  # Skip header row
+    columns = row.find_all('td')
+    row_data = [col.text.strip() for col in columns]
+    if row_data:  # Avoid empty rows
+        rows.append(row_data)
+
+# Step 6: Convert to DataFrame
+df = pd.DataFrame(rows, columns=headers[:len(rows[0])])  # Ensure column length matches row length
+
+# Step 7: Save to CSV
 df.to_csv("TopUSCompanies.csv", index=False)
+print("Data saved successfully!")
 
